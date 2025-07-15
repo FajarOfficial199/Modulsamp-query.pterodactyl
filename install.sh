@@ -59,13 +59,13 @@ install_module() {
     
     # Download the files directly
     wget -O "$PANEL_DIR/app/Extensions/ServerInfo/SampQueryExtension.php" \
-        https://raw.githubusercontent.com/fajarofficial/pterodactyl-samp-query-module/main/SampQueryExtension.php
+        https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/refs/heads/main/SampQueryExtension.php
     
     wget -O "$PANEL_DIR/app/Extensions/ServerInfo/samp-query.js" \
-        https://raw.githubusercontent.com/fajarofficial/pterodactyl-samp-query-module/main/samp-query.js
+        https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/refs/heads/main/samp-query.js
     
     wget -O "$PANEL_DIR/resources/views/extensions/samp_query.blade.php" \
-        https://raw.githubusercontent.com/fajarofficial/pterodactyl-samp-query-module/main/samp_query.blade.php
+        https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/refs/heads/main/samp_query.blade.php
     
     # Update config/extensions.php
     if ! grep -q "SampQueryExtension" "$PANEL_DIR/config/extensions.php"; then
