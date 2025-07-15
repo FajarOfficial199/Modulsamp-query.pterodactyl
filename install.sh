@@ -1,13 +1,19 @@
 #!/bin/bash
 
 # Pterodactyl SA-MP Query Module Installer
-# For Ubuntu 20.04/22.04
+# Optimized for direct GitHub raw URL installation
+# By FajarOfficial
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
+
+# GitHub URLs
+EXTENSION_URL="https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/main/SampQueryExtension.php"
+JS_URL="https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/main/samp-query.js"
+BLADE_URL="https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/main/samp_query.blade.php"
 
 header() {
     clear
@@ -32,44 +38,86 @@ check_root() {
     fi
 }
 
-install_dependencies() {
-    echo -e "${YELLOW}[1] Installing dependencies...${NC}"
-    apt update
-    apt install -y nodejs npm
-    check_command
+check_nodejs() {
+    echo -e "${YELLOW}[1] Checking Node.js version...${NC}"
     
-    # Ensure Node.js v14+
+    if ! command -v node &> /dev/null; then
+        echo -e "${YELLOW}Node.js not found, installing LTS version...${NC}"
+        install_nodejs
+        return
+    fi
+    
     node_version=$(node -v | cut -d'.' -f1 | tr -d 'v')
     if [ "$node_version" -lt 14 ]; then
-        echo -e "${YELLOW}Node.js version too old, installing LTS version...${NC}"
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
-        apt-get install -y nodejs
-        check_command
+        echo -e "${YELLOW}Node.js version too old (v$node_version), upgrading...${NC}"
+        install_nodejs
+    else
+        echo -e "${GREEN}✓ Node.js v$node_version (meets requirement)${NC}"
     fi
 }
 
+check_npm() {
+    echo -e "${YELLOW}[2] Checking npm version...${NC}"
+    
+    if ! command -v npm &> /dev/null; then
+        echo -e "${YELLOW}npm not found, installing...${NC}"
+        install_nodejs
+        return
+    fi
+    
+    npm_version=$(npm -v | cut -d'.' -f1)
+    if [ "$npm_version" -lt 6 ]; then
+        echo -e "${YELLOW}npm version too old (v$npm_version), upgrading...${NC}"
+        install_nodejs
+    else
+        echo -e "${GREEN}✓ npm v$npm_version (meets requirement)${NC}"
+    fi
+}
+
+install_nodejs() {
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    apt-get install -y nodejs
+    check_command
+    echo -e "${GREEN}✓ Node.js $(node -v) installed${NC}"
+}
+
 install_module() {
-    echo -e "${YELLOW}[2] Installing SA-MP Query module...${NC}"
+    echo -e "${YELLOW}[3] Installing SA-MP Query module...${NC}"
     
     PANEL_DIR="/var/www/pterodactyl"
     
-    # Create necessary directories
+    # Create directories
     mkdir -p "$PANEL_DIR/app/Extensions/ServerInfo"
     mkdir -p "$PANEL_DIR/resources/views/extensions"
     
-    # Download the files directly
-    wget -O "$PANEL_DIR/app/Extensions/ServerInfo/SampQueryExtension.php" \
-        https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/refs/heads/main/SampQueryExtension.php
+    # Download files directly from GitHub
+    wget -q --show-progress -O "$PANEL_DIR/app/Extensions/ServerInfo/SampQueryExtension.php" "$EXTENSION_URL"
+    wget -q --show-progress -O "$PANEL_DIR/app/Extensions/ServerInfo/samp-query.js" "$JS_URL"
+    wget -q --show-progress -O "$PANEL_DIR/resources/views/extensions/samp_query.blade.php" "$BLADE_URL"
     
-    wget -O "$PANEL_DIR/app/Extensions/ServerInfo/samp-query.js" \
-        https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/refs/heads/main/samp-query.js
+    # Install samp-query package if not exists
+    if [ ! -d "$PANEL_DIR/node_modules/samp-query" ]; then
+        echo -e "${YELLOW}[4] Installing samp-query package...${NC}"
+        cd "$PANEL_DIR"
+        sudo -u www-data npm install samp-query
+        check_command
+    else
+        echo -e "${GREEN}✓ samp-query already installed${NC}"
+    fi
     
-    wget -O "$PANEL_DIR/resources/views/extensions/samp_query.blade.php" \
-        https://raw.githubusercontent.com/FajarOfficial199/Modulsamp-query.pterodactyl/refs/heads/main/samp_query.blade.php
+    # Update config
+    update_config
+}
+
+update_config() {
+    echo -e "${YELLOW}[5] Updating panel configuration...${NC}"
     
-    # Update config/extensions.php
+    PANEL_DIR="/var/www/pterodactyl"
+    
+    # Update extensions.php
     if ! grep -q "SampQueryExtension" "$PANEL_DIR/config/extensions.php"; then
         sed -i "/'server_info' => \[/a \        \\\App\\Extensions\\ServerInfo\\SampQueryExtension::class," "$PANEL_DIR/config/extensions.php"
+        echo -e "${GREEN}✓ Added to config/extensions.php${NC}"
     fi
     
     # Update routes/api.php
@@ -78,12 +126,8 @@ install_module() {
         echo "Route::get('/extensions/samp-query', 'Extensions\ServerInfo\SampQueryExtension@index')" >> "$PANEL_DIR/routes/api.php"
         echo "    ->name('extensions.samp-query')" >> "$PANEL_DIR/routes/api.php"
         echo "    ->middleware('server.error');" >> "$PANEL_DIR/routes/api.php"
+        echo -e "${GREEN}✓ Added to routes/api.php${NC}"
     fi
-    
-    # Install npm package
-    cd "$PANEL_DIR" || exit
-    npm install samp-query
-    check_command
     
     # Set permissions
     chown -R www-data:www-data "$PANEL_DIR"
@@ -92,17 +136,19 @@ install_module() {
     sudo -u www-data php artisan view:clear
     sudo -u www-data php artisan cache:clear
     
-    echo -e "${GREEN}Module installed successfully!${NC}"
+    echo -e "${GREEN}✓ Module installed successfully!${NC}"
 }
 
 main() {
     header
     check_root
-    install_dependencies
+    check_nodejs
+    check_npm
     install_module
     
     echo -e "\n${GREEN}Installation complete!${NC}"
     echo -e "The SA-MP Query module will now appear in your Pterodactyl server view."
+    echo -e "\nNote: Make sure your SA-MP server allows queries from external IPs."
 }
 
 main
